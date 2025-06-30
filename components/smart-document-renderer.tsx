@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { ImageInserter } from "@/lib/image-inserter"
-import ReactMarkdown from "react-markdown"
+import { Markdown } from "@/components/markdown"
 import { ImageLayer } from "./image-layer"
 
 interface ImageData {
@@ -50,7 +50,7 @@ export function SmartDocumentRenderer({
         className="prose prose-sm dark:prose-invert max-w-none"
         style={{ width: pageWidth, height: pageHeight }}
       >
-        <ReactMarkdown>{processedMarkdown}</ReactMarkdown>
+        <Markdown>{processedMarkdown}</Markdown>
       </div>
       <ImageLayer
         images={images}
