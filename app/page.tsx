@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { FileUploader } from "@/components/file-uploader"
 import { ProcessingIndicator } from "@/components/processing-indicator"
 import { ResultsViewer } from "@/components/results-viewer"
@@ -8,7 +9,9 @@ import { InfoPanel } from "@/components/info-panel"
 import { ErrorDisplay } from "@/components/error-display"
 import { SamplePdfOption } from "@/components/sample-pdf-option"
 import { Button } from "@/components/ui/button"
-import { School } from "lucide-react"
+import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/hooks/use-toast"
+import { School, Sparkles, FileText, MessageSquare, Zap } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 // ResultsViewer props와 일치하는 인터페이스 정의
@@ -55,12 +58,20 @@ export default function Home() {
   const [results, setResults] = useState<ResultsData | null>(null)
   const [error, setError] = useState<{ message: string; details?: string } | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const { toast } = useToast()
 
   const handleFileSelected = (selectedFile: File, fileIsSample = false) => {
     setFile(selectedFile)
     setIsSample(fileIsSample)
     setResults(null)
     setError(null)
+    
+    // Toast уведомление о выборе файла
+    toast({
+      title: "Файл выбран",
+      description: `${selectedFile.name} готов к обработке${fileIsSample ? " (демо файл)" : ""}`,
+      variant: "success",
+    })
   }
 
   const handleProcessFile = async () => {
@@ -68,6 +79,13 @@ export default function Home() {
 
     setError(null)
     setProcessingStage("uploading")
+
+    // Toast уведомление о начале обработки
+    toast({
+      title: "Начинаем обработку",
+      description: "Загружаем документ в Mistral API...",
+      variant: "info",
+    })
 
     const formData = new FormData()
     formData.append("pdf", file)
@@ -94,6 +112,13 @@ export default function Home() {
       }
 
       setResults(data)
+      
+      // Toast уведомление об успешной обработке
+      toast({
+        title: "Обработка завершена!",
+        description: `Документ успешно обработан. Извлечено ${data.pages?.length || 0} страниц.`,
+        variant: "success",
+      })
     } catch (error) {
       console.error("Error processing PDF:", error)
 
@@ -122,6 +147,13 @@ export default function Home() {
         message: errorMessage,
         details: errorDetails,
       })
+      
+      // Toast уведомление об ошибке
+      toast({
+        title: "Ошибка обработки",
+        description: errorMessage,
+        variant: "error",
+      })
     } finally {
       setProcessingStage(null)
     }
@@ -144,94 +176,277 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-background">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Mistral OCR PDF Parser</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleInfoPanel}
-              aria-label="Show information"
-              className={showInfo ? "bg-accent" : ""}
-            >
-              <School className="h-5 w-5" />
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-
-        {showInfo && <InfoPanel onClose={toggleInfoPanel} />}
-
-        <div className="grid grid-cols-1 lg:grid-cols-9 gap-8">
-          <div className="space-y-6 lg:col-span-2">
-            <div className="bg-card rounded-lg p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Upload PDF</h2>
-              <FileUploader onFileSelected={(file) => handleFileSelected(file, false)} />
-
-              <SamplePdfOption onSelect={handleFileSelected} />
-
-              {file && !processingStage && (
-                <div className="mt-4">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Selected file: {file.name}
-                    {isSample && " (Sample)"}
-                  </p>
-                  <Button onClick={handleProcessFile} className="w-full">
-                    Process PDF
-                  </Button>
-                </div>
-              )}
-
-              {results && results.usage && (
-                <div className="mt-4 bg-muted/30 p-3 rounded-md text-xs text-muted-foreground">
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span>Model:</span>
-                      <span>{results.model || "mistral-ocr-latest"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Pages processed:</span>
-                      <span>{results.usage.pages_processed}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Document size:</span>
-                      <span>{formatBytes(results.usage.doc_size_bytes)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {processingStage && (
-              <div className="bg-card rounded-lg p-6 shadow-sm">
-                <ProcessingIndicator stage={processingStage} />
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-card rounded-lg p-6 shadow-sm">
-                <ErrorDisplay message={error.message} details={error.details} onRetry={handleProcessFile} />
-              </div>
-            )}
-          </div>
-
-          <div className="bg-card rounded-lg p-6 shadow-sm lg:col-span-7">
-            {results ? (
-              <ResultsViewer results={results} originalFile={file} />
-            ) : (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Results</h2>
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                  <p className="text-muted-foreground">Upload and process a PDF to see the parsed results</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-radial from-primary/5 to-transparent rounded-full animate-pulse-slow" />
       </div>
-    </main>
+
+      <main className="relative z-10 p-4 md:p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <motion.header 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-12"
+          >
+            <div className="space-y-2">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gradient">
+                Mistral OCR
+              </h1>
+              <p className="text-lg md:text-xl text-muted-foreground">
+                Превратите PDF в интерактивные документы с ИИ
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleInfoPanel}
+                  aria-label="Show information"
+                  className={`hover-lift ${showInfo ? "bg-accent text-accent-foreground" : ""}`}
+                >
+                  <School className="h-5 w-5" />
+                </Button>
+              </motion.div>
+              <ThemeToggle />
+            </div>
+          </motion.header>
+
+          {/* Features showcase */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+          >
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-card/50 backdrop-blur-sm border hover-lift">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold">OCR обработка</h3>
+                <p className="text-sm text-muted-foreground">Точное извлечение текста</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-card/50 backdrop-blur-sm border hover-lift">
+              <div className="p-2 rounded-lg bg-accent/10">
+                <MessageSquare className="h-6 w-6 text-accent" />
+              </div>
+              <div>
+                <h3 className="font-semibold">ChatPDF</h3>
+                <p className="text-sm text-muted-foreground">Общение с документом</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-card/50 backdrop-blur-sm border hover-lift">
+              <div className="p-2 rounded-lg bg-success/10">
+                <Zap className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Быстрая обработка</h3>
+                <p className="text-sm text-muted-foreground">Результат за секунды</p>
+              </div>
+            </div>
+          </motion.section>
+
+          {/* Info Panel */}
+          <AnimatePresence>
+            {showInfo && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mb-8"
+              >
+                <InfoPanel onClose={toggleInfoPanel} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Main content */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
+            {/* Sidebar */}
+            <motion.aside
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="lg:col-span-5 xl:col-span-4 space-y-4 lg:space-y-6"
+            >
+              {/* Upload section */}
+              <div className="glass-effect rounded-2xl p-6 hover-lift">
+                <div className="flex items-center gap-2 mb-6">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Загрузка документа</h2>
+                </div>
+                
+                <FileUploader onFileSelected={(file) => handleFileSelected(file, false)} />
+                <SamplePdfOption onSelect={handleFileSelected} />
+
+                <AnimatePresence>
+                  {file && !processingStage && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-6 space-y-4"
+                    >
+                      <div className="p-4 rounded-xl bg-muted/30 border">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Выбранный файл</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {file.name}
+                          {isSample && " (Демо)"}
+                        </p>
+                      </div>
+                      
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Button 
+                          onClick={handleProcessFile} 
+                          className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
+                        >
+                          <Zap className="h-4 w-4 mr-2" />
+                          Обработать PDF
+                        </Button>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Usage stats */}
+                <AnimatePresence>
+                  {results && results.usage && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="mt-6 p-4 rounded-xl bg-gradient-to-r from-success/10 to-primary/10 border border-success/20"
+                    >
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-success" />
+                        Статистика обработки
+                      </h3>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Модель:</span>
+                          <span className="font-medium">{results.model || "mistral-ocr-latest"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Страниц обработано:</span>
+                          <span className="font-medium">{results.usage.pages_processed}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Размер документа:</span>
+                          <span className="font-medium">{formatBytes(results.usage.doc_size_bytes)}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Processing indicator */}
+              <AnimatePresence>
+                {processingStage && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="glass-effect rounded-2xl p-6"
+                  >
+                    <ProcessingIndicator stage={processingStage} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Error display */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="glass-effect rounded-2xl p-6 border-error/20"
+                  >
+                    <ErrorDisplay message={error.message} details={error.details} onRetry={handleProcessFile} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.aside>
+
+            {/* Main content area */}
+            <motion.section
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="lg:col-span-7 xl:col-span-8"
+            >
+              <div className="glass-effect rounded-2xl p-6 min-h-[600px]">
+                <AnimatePresence mode="wait">
+                  {results ? (
+                    <motion.div
+                      key="results"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.4 }}
+                    >
+                      <ResultsViewer results={results} originalFile={file} />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center h-full text-center py-20"
+                    >
+                      <div className="relative mb-8">
+                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                          <FileText className="h-12 w-12 text-primary" />
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                          <Sparkles className="h-4 w-4 text-accent" />
+                        </div>
+                      </div>
+                      
+                      <h2 className="text-2xl font-semibold mb-4">Результаты обработки</h2>
+                      <p className="text-muted-foreground max-w-md">
+                        Загрузите и обработайте PDF документ, чтобы увидеть извлеченный текст, 
+                        изображения и начать интерактивное общение с документом
+                      </p>
+                      
+                      <div className="mt-8 flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">OCR</span>
+                        <span className="px-3 py-1 rounded-full bg-accent/10 text-accent text-sm">ChatPDF</span>
+                        <span className="px-3 py-1 rounded-full bg-success/10 text-success text-sm">Анализ</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.section>
+          </div>
+        </div>
+      </main>
+      
+      {/* Toast notifications */}
+      <Toaster />
+    </div>
   )
 }
-

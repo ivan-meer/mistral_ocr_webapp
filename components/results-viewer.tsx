@@ -167,14 +167,14 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
     llm_context_md += markdown
   }
 
-  // Custom renderer for images to handle missing or invalid URLs
+  // Custom renderer for images - скрываем изображения в markdown чтобы избежать дублирования
   const imageRenderer = (props: ImageRendererProps) => {
-    const { src, alt } = props
-    // If src is empty or just an ID (not a URL), use a placeholder
-    if (!src || (!src.includes("/") && !src.includes(":"))) {
-      return <img src="/placeholder.svg?height=200&width=300" alt={alt || "Image placeholder"} />
-    }
-    return <img src={src || "/placeholder.svg"} alt={alt || "Extracted image"} />
+    const { alt } = props
+    // Возвращаем span вместо div чтобы избежать hydration error
+    // Изображения будут отображаться только через абсолютное позиционирование
+    return (
+      <span className="sr-only">{alt || "Image"}</span>
+    )
   }
 
   // 채팅 토글 핸들러
@@ -185,24 +185,43 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
   return (
     <div className="space-y-4" ref={containerRef}>
       <h2 className="text-xl font-semibold mb-4">Results</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
-        {/* 채팅 인터페이스 */}
-        {isChatOpen && (
-          <div
-            className="lg:col-span-3 bg-card rounded-lg shadow-sm overflow-hidden"
+      
+      {/* Чат как модальное окно на мобильных устройствах */}
+      {isChatOpen && (
+        <>
+          {/* Overlay для мобильных */}
+          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={toggleChat} />
+          
+          {/* Чат контейнер */}
+          <div className={`
+            ${isChatOpen ? 'lg:block' : 'hidden'}
+            fixed lg:static
+            inset-0 lg:inset-auto
+            z-50 lg:z-10
+            lg:col-span-3
+            bg-card rounded-lg shadow-sm overflow-hidden
+            m-4 lg:m-0
+          `}
             style={{
               height: height ? `calc(${height}px - 200px)` : "calc(100vh - 200px)",
-              position: "sticky",
-              top: "1rem",
-              zIndex: 10, // 스크롤 시 다른 요소 위에 표시되도록 z-index 추가
+              position: isChatOpen ? "fixed" : "static",
+              top: isChatOpen ? "1rem" : "auto",
+              left: isChatOpen ? "1rem" : "auto",
+              right: isChatOpen ? "1rem" : "auto",
+              bottom: isChatOpen ? "1rem" : "auto",
             }}
           >
             <ChatInterface onClose={toggleChat} documentTitle={originalFile?.name} rawText={llm_context_md} />
           </div>
-        )}
+        </>
+      )}
 
-        {/* 메인 콘텐츠 */}
-        <div className={`${isChatOpen ? "lg:col-span-4" : "lg:col-span-7"}`}>
+      <div className={`grid grid-cols-1 gap-4 ${isChatOpen ? 'lg:grid-cols-7' : ''}`}>
+        {/* Placeholder для чата на десктопе */}
+        {isChatOpen && <div className="hidden lg:block lg:col-span-3" />}
+
+        {/* Меин контент */}
+        <div className={`${isChatOpen ? "lg:col-span-4" : "col-span-full"}`}>
           <Tabs defaultValue="reconstructed" value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center mb-4">
               <TabsList>
@@ -468,4 +487,3 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
     </div>
   )
 }
-
