@@ -132,6 +132,171 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
     document.body.removeChild(link)
   }
 
+  // Конвертация изображения в base64
+  const imageToBase64 = async (imageUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(imageUrl)
+      const blob = await response.blob()
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    } catch (error) {
+      console.error('Error converting image to base64:', error)
+      return ''
+    }
+  }
+
+  // Экспорт markdown с встроенными base64 изображениями для LLM
+  const handleExportForLLM = async () => {
+    let markdownContent = results.text
+    
+    // Получаем все изображения из результатов
+    const images = results.images || []
+    
+    // Конвертируем изображения в base64 и заменяем ссылки
+    for (const image of images) {
+      if (image.url && !image.url.startsWith('data:')) {
+        try {
+          const base64Data = await imageToBase64(image.url)
+          if (base64Data) {
+            // Заменяем все вхождения URL изображения на base64
+            const urlPattern = new RegExp(image.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+            markdownContent = markdownContent.replace(urlPattern, base64Data)
+            
+            // Также заменяем по ID изображения, если есть
+            const idPattern = new RegExp(`!\\[${image.id}\\]\\([^)]+\\)`, 'g')
+            markdownContent = markdownContent.replace(idPattern, `![${image.id}](${base64Data})`)
+          }
+        } catch (error) {
+          console.error(`Error processing image ${image.id}:`, error)
+        }
+      }
+    }
+
+    // Добавляем метаинформацию для LLM
+    const llmDocument = `# Документ: ${originalFile?.name || 'Неизвестный файл'}
+
+## Метаинформация
+- **Обработано страниц**: ${results.usage?.pages_processed || results.pages.length}
+- **Размер документа**: ${results.usage?.doc_size_bytes ? formatBytes(results.usage.doc_size_bytes) : 'Неизвестно'}
+- **Модель OCR**: ${results.model || 'mistral-ocr-latest'}
+- **Количество изображений**: ${images.length}
+- **Дата обработки**: ${new Date().toLocaleString('ru-RU')}
+
+## Содержимое документа
+
+${markdownContent}
+
+---
+*Этот документ был обработан с помощью Mistral OCR и подготовлен для анализа ИИ. Все изображения встроены в формате base64.*
+`
+
+    // Скачиваем готовый файл
+    const blob = new Blob([llmDocument], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${originalFile?.name.replace('.pdf', '') || 'parsed'}_for_llm.md`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    URL.revokeObjectURL(url)
+  }
+
+  // Экспорт JSON с base64 изображениями
+  const handleExportJSONForLLM = async () => {
+    const llmResults = { ...results }
+    
+    // Конвертируем все изображения в base64
+    if (llmResults.images) {
+      for (const image of llmResults.images) {
+        if (image.url && !image.url.startsWith('data:')) {
+          try {
+            const base64Data = await imageToBase64(image.url)
+            if (base64Data) {
+              image.url = base64Data
+            }
+          } catch (error) {
+            console.error(`Error processing image ${image.id}:`, error)
+          }
+        }
+      }
+    }
+
+    // Обновляем изображения в страницах
+    if (llmResults.pages) {
+      for (const page of llmResults.pages) {
+        if (page.images) {
+          for (const image of page.images) {
+            if (image.url && !image.url.startsWith('data:')) {
+              try {
+                const base64Data = await imageToBase64(image.url)
+                if (base64Data) {
+                  image.url = base64Data
+                }
+              } catch (error) {
+                console.error(`Error processing image ${image.id}:`, error)
+              }
+            }
+          }
+        }
+        
+        // Также обновляем markdown в страницах
+        let updatedMarkdown = page.markdown
+        for (const image of page.images) {
+          if (image.url && image.url.startsWith('data:')) {
+            const urlPattern = new RegExp(`!\\[${image.id}\\]\\([^)]+\\)`, 'g')
+            updatedMarkdown = updatedMarkdown.replace(urlPattern, `![${image.id}](${image.url})`)
+          }
+        }
+        page.markdown = updatedMarkdown
+      }
+    }
+
+    // Обновляем основной текст
+    let updatedText = llmResults.text
+    for (const image of llmResults.images || []) {
+      if (image.url && image.url.startsWith('data:')) {
+        const urlPattern = new RegExp(`!\\[${image.id}\\]\\([^)]+\\)`, 'g')
+        updatedText = updatedText.replace(urlPattern, `![${image.id}](${image.url})`)
+      }
+    }
+    llmResults.text = updatedText
+
+    // Добавляем метаинформацию
+    const llmDocument = {
+      metadata: {
+        original_filename: originalFile?.name || 'unknown',
+        processed_at: new Date().toISOString(),
+        pages_processed: results.usage?.pages_processed || results.pages.length,
+        doc_size_bytes: results.usage?.doc_size_bytes || 0,
+        model: results.model || 'mistral-ocr-latest',
+        images_count: (results.images || []).length,
+        export_type: 'llm_ready',
+        note: 'Все изображения встроены в формате base64 для совместимости с LLM'
+      },
+      content: llmResults
+    }
+
+    const dataStr = JSON.stringify(llmDocument, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(dataBlob)
+
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${originalFile?.name.replace('.pdf', '') || 'parsed'}_llm_ready.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    URL.revokeObjectURL(url)
+  }
+
   const zoomIn = () => {
     setZoomLevel((prev) => Math.min(prev + 0.1, 2))
   }
@@ -266,6 +431,16 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
               <Button variant="outline" size="sm" onClick={handleDownloadResults} className="flex items-center gap-1">
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Download</span>
+              </Button>
+              
+              <Button variant="outline" size="sm" onClick={handleExportForLLM} className="flex items-center gap-1">
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Export MD for LLM</span>
+              </Button>
+              
+              <Button variant="outline" size="sm" onClick={handleExportJSONForLLM} className="flex items-center gap-1">
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Export JSON for LLM</span>
               </Button>
             </div>
 
