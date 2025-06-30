@@ -1,10 +1,9 @@
 "use client"
 
 import { useMemo } from "react"
-import { Markdown } from "@/components/markdown"
 import { ImageInserter } from "@/lib/image-inserter"
 import ReactMarkdown from "react-markdown"
-import rehypeRaw from "rehype-raw"
+import { ImageLayer } from "./image-layer"
 
 interface ImageData {
   id: string
@@ -38,71 +37,25 @@ export function SmartDocumentRenderer({
   className = ""
 }: SmartDocumentRendererProps) {
   
-  // Мемоизируем обработанный markdown для производительности
   const processedMarkdown = useMemo(() => {
     if (!images || images.length === 0) {
       return markdown
     }
-    
     return ImageInserter.insertImages(markdown, images, pageHeight, imageSize)
   }, [markdown, images, pageHeight, imageSize])
 
   return (
-    <div className={`smart-document-renderer ${className}`}>
-      {/* Стили для встроенных изображений */}
-      <style jsx>{`
-        .smart-document-renderer :global(.image-container) {
-          margin: 1.5rem auto;
-          text-align: center;
-        }
-        
-        .smart-document-renderer :global(.image-container.max-w-xs) {
-          max-width: 20rem;
-        }
-        
-        .smart-document-renderer :global(.image-container.max-w-md) {
-          max-width: 28rem;
-        }
-        
-        .smart-document-renderer :global(.image-container.max-w-lg) {
-          max-width: 32rem;
-        }
-        
-        .smart-document-renderer :global(.image-container img) {
-          width: 100%;
-          height: auto;
-          border-radius: 0.5rem;
-          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .smart-document-renderer :global(.image-container img:hover) {
-          transform: scale(1.02);
-          box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
-        }
-        
-        .smart-document-renderer :global(.image-container .text-xs) {
-          margin-top: 0.5rem;
-          font-size: 0.75rem;
-          color: #6b7280;
-          opacity: ${showImageInfo ? '1' : '0'};
-          transition: opacity 0.2s ease;
-        }
-        
-        /* Темная тема */
-        .dark .smart-document-renderer :global(.image-container img) {
-          border-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .dark .smart-document-renderer :global(.image-container .text-xs) {
-          color: #9ca3af;
-        }
-      `}</style>
-      
-      <div 
+    <div className={`smart-document-renderer relative ${className}`}>
+      <div
         className="prose prose-sm dark:prose-invert max-w-none"
-        dangerouslySetInnerHTML={{ __html: processedMarkdown }}
+        style={{ width: pageWidth, height: pageHeight }}
+      >
+        <ReactMarkdown>{processedMarkdown}</ReactMarkdown>
+      </div>
+      <ImageLayer
+        images={images}
+        pageWidth={pageWidth}
+        pageHeight={pageHeight}
       />
     </div>
   )

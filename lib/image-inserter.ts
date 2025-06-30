@@ -50,28 +50,67 @@ export class ImageInserter {
    * Вычисляет оптимальные точки для вставки изображений
    */
   private static calculateInsertionPoints(
-    lines: string[], 
-    images: ImageData[], 
-    pageHeight: number
+    lines: string[],
+    images: ImageData[],
+    pageHeight: number // Unused
   ): InsertionPoint[] {
+    // Sort images by their original y-coordinate to try and keep them in a sensible order.
+    const sortedImages = [...images].sort(
+      (a, b) => a.coordinates.y - b.coordinates.y
+    )
+
     const insertionPoints: InsertionPoint[] = []
-    
-    for (const image of images) {
-      // Нормализуем Y-координату изображения (0-1) к количеству строк
-      const relativeY = image.coordinates.y
-      const targetLineIndex = Math.floor(relativeY * lines.length)
-      
-      // Находим лучшую позицию для вставки рядом с целевой строкой
-      const bestLineIndex = this.findBestInsertionLine(lines, targetLineIndex)
-      
+    const potentialInsertionLines: number[] = []
+
+    // Find potential insertion points (after paragraphs, i.e., after a non-empty line followed by an empty one)
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (lines[i].trim() !== "" && lines[i + 1].trim() === "") {
+        potentialInsertionLines.push(i)
+      }
+    }
+    // Also consider the end of the document as an insertion point
+    if (lines.length > 0 && lines[lines.length - 1].trim() !== "") {
+      potentialInsertionLines.push(lines.length - 1)
+    }
+
+    const numImages = sortedImages.length
+    const numSpots = potentialInsertionLines.length
+
+    if (numSpots === 0) {
+      // No good spots, just append to the end.
+      sortedImages.forEach(image => {
+        insertionPoints.push({
+          lineIndex: lines.length > 0 ? lines.length - 1 : 0,
+          yPosition: image.coordinates.y,
+          image,
+        })
+      })
+      // Remove duplicates
+      return insertionPoints.filter(
+        (point, index, self) =>
+          index === self.findIndex(p => p.lineIndex === point.lineIndex)
+      )
+    }
+
+    // Distribute images among the available spots.
+    for (let i = 0; i < numImages; i++) {
+      const spotIndex = Math.floor(i * (numSpots / numImages))
+      const lineIndex = potentialInsertionLines[spotIndex]
       insertionPoints.push({
-        lineIndex: bestLineIndex,
-        yPosition: relativeY,
-        image
+        lineIndex: lineIndex,
+        yPosition: sortedImages[i].coordinates.y,
+        image: sortedImages[i],
       })
     }
-    
-    return insertionPoints
+
+    // Remove duplicate line indices to avoid inserting multiple images at the exact same line.
+    // This can happen if there are more images than spots.
+    const uniqueInsertionPoints = insertionPoints.filter(
+      (point, index, self) =>
+        index === self.findIndex(p => p.lineIndex === point.lineIndex)
+    )
+
+    return uniqueInsertionPoints
   }
 
   /**
