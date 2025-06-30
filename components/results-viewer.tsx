@@ -223,43 +223,50 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
         {/* Меин контент */}
         <div className={`${isChatOpen ? "lg:col-span-4" : "col-span-full"}`}>
           <Tabs defaultValue="reconstructed" value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex justify-between items-center mb-4">
+            {/* Первая строка - Табы */}
+            <div className="flex justify-center mb-4">
               <TabsList>
                 <TabsTrigger value="reconstructed">Reconstructed View</TabsTrigger>
                 {results.storedAssets && results.storedAssets.length > 0 && (
                   <TabsTrigger value="assets">Asset View</TabsTrigger>
                 )}
               </TabsList>
+            </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant={isChatOpen ? "default" : "outline"}
-                  size="sm"
-                  onClick={toggleChat}
-                  className="flex items-center gap-1"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="hidden sm:inline">ChatPDF</span>
-                </Button>
-                {activeTab === "reconstructed" && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={zoomIn} className="flex items-center gap-1">
-                      <ZoomIn className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={zoomOut} className="flex items-center gap-1">
-                      <ZoomOut className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-                <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="flex items-center gap-1">
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadResults} className="flex items-center gap-1">
-                  <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline">Download</span>
-                </Button>
-              </div>
+            {/* Вторая строка - Кнопки действий */}
+            <div className="flex flex-wrap justify-center gap-2 mb-4">
+              <Button
+                variant={isChatOpen ? "default" : "outline"}
+                size="sm"
+                onClick={toggleChat}
+                className="flex items-center gap-1"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">ChatPDF</span>
+              </Button>
+              
+              {activeTab === "reconstructed" && (
+                <>
+                  <Button variant="outline" size="sm" onClick={zoomIn} className="flex items-center gap-1">
+                    <ZoomIn className="h-4 w-4" />
+                    <span className="hidden sm:inline">Zoom In</span>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={zoomOut} className="flex items-center gap-1">
+                    <ZoomOut className="h-4 w-4" />
+                    <span className="hidden sm:inline">Zoom Out</span>
+                  </Button>
+                </>
+              )}
+              
+              <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="flex items-center gap-1">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
+              </Button>
+              
+              <Button variant="outline" size="sm" onClick={handleDownloadResults} className="flex items-center gap-1">
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Download</span>
+              </Button>
             </div>
 
             {results.pages.length > 1 && activeTab !== "assets" && (
@@ -319,7 +326,7 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
                     <Tooltip key={index}>
                       <TooltipTrigger asChild>
                         <div
-                          className="absolute border border-dashed border-primary/50 cursor-help"
+                          className="absolute border border-dashed border-primary/50 cursor-help z-10 pointer-events-none"
                           style={{
                             left: `${image.coordinates.x * 100}%`,
                             top: `${image.coordinates.y * 100}%`,
@@ -332,10 +339,10 @@ export function ResultsViewer({ results, originalFile }: ResultsViewerProps) {
                           <img
                             src={image.url || "/placeholder.svg?height=200&width=300"}
                             alt={`Extracted image ${index + 1}`}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-contain pointer-events-auto"
                           />
                           {showImageInfo === image.id && (
-                            <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs p-1 rounded-bl">
+                            <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs p-1 rounded-bl pointer-events-auto">
                               <Info className="h-3 w-3" />
                             </div>
                           )}

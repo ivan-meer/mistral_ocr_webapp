@@ -4,6 +4,8 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { FileUploader } from "@/components/file-uploader"
 import { ProcessingIndicator } from "@/components/processing-indicator"
+import { ProcessingModal } from "@/components/processing-modal"
+import { CompactFileStatus } from "@/components/compact-file-status"
 import { ResultsViewer } from "@/components/results-viewer"
 import { InfoPanel } from "@/components/info-panel"
 import { ErrorDisplay } from "@/components/error-display"
@@ -58,6 +60,7 @@ export default function Home() {
   const [results, setResults] = useState<ResultsData | null>(null)
   const [error, setError] = useState<{ message: string; details?: string } | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const [showProcessingModal, setShowProcessingModal] = useState(false)
   const { toast } = useToast()
 
   const handleFileSelected = (selectedFile: File, fileIsSample = false) => {
@@ -74,18 +77,23 @@ export default function Home() {
     })
   }
 
+  const handleFileChange = (newFile: File | null) => {
+    if (newFile) {
+      handleFileSelected(newFile, false)
+    } else {
+      setFile(null)
+      setResults(null)
+      setError(null)
+      setIsSample(false)
+    }
+  }
+
   const handleProcessFile = async () => {
     if (!file) return
 
     setError(null)
     setProcessingStage("uploading")
-
-    // Toast уведомление о начале обработки
-    toast({
-      title: "Начинаем обработку",
-      description: "Загружаем документ в Mistral API...",
-      variant: "info",
-    })
+    setShowProcessingModal(true)
 
     const formData = new FormData()
     formData.append("pdf", file)
@@ -156,6 +164,7 @@ export default function Home() {
       })
     } finally {
       setProcessingStage(null)
+      setShowProcessingModal(false)
     }
   }
 
@@ -275,128 +284,109 @@ export default function Home() {
           </AnimatePresence>
 
           {/* Main content */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
-            {/* Sidebar */}
-            <motion.aside
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="lg:col-span-5 xl:col-span-4 space-y-4 lg:space-y-6"
-            >
-              {/* Upload section */}
-              <div className="glass-effect rounded-2xl p-6 hover-lift">
-                <div className="flex items-center gap-2 mb-6">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <h2 className="text-xl font-semibold">Загрузка документа</h2>
-                </div>
-                
-                <FileUploader onFileSelected={(file) => handleFileSelected(file, false)} />
-                <SamplePdfOption onSelect={handleFileSelected} />
+          <div className={`transition-all duration-500 ${results ? 'space-y-6' : 'grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8'}`}>
+            {/* Компактная строка файла когда есть результаты */}
+            {results && file && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-effect rounded-xl p-4"
+              >
+                <CompactFileStatus
+                  file={file}
+                  isSample={isSample}
+                  onFileChange={handleFileChange}
+                  onReprocess={handleProcessFile}
+                />
+              </motion.div>
+            )}
 
-                <AnimatePresence>
-                  {file && !processingStage && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-6 space-y-4"
-                    >
-                      <div className="p-4 rounded-xl bg-muted/30 border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium">Выбранный файл</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {file.name}
-                          {isSample && " (Демо)"}
-                        </p>
-                      </div>
+            {/* Sidebar - только когда нет результатов */}
+            {!results && (
+              <motion.aside
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="lg:col-span-5 xl:col-span-4 space-y-4 lg:space-y-6"
+              >
+                {/* Upload section */}
+                <div className="glass-effect rounded-2xl p-6 hover-lift">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <h2 className="text-xl font-semibold">Документ</h2>
+                  </div>
+                  
+                  {/* Компактный статус файла или загрузчик */}
+                  {file ? (
+                    <div className="space-y-4">
+                      <CompactFileStatus
+                        file={file}
+                        isSample={isSample}
+                        onFileChange={handleFileChange}
+                        onReprocess={undefined}
+                      />
                       
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Button 
-                          onClick={handleProcessFile} 
-                          className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
+                      {!processingStage && (
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                         >
-                          <Zap className="h-4 w-4 mr-2" />
-                          Обработать PDF
-                        </Button>
-                      </motion.div>
-                    </motion.div>
+                          <Button 
+                            onClick={handleProcessFile} 
+                            className="w-full h-12 text-base font-medium bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg"
+                          >
+                            <Zap className="h-4 w-4 mr-2" />
+                            Обработать PDF
+                          </Button>
+                        </motion.div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <FileUploader onFileSelected={(file) => handleFileSelected(file, false)} />
+                      <SamplePdfOption onSelect={handleFileSelected} />
+                    </div>
                   )}
-                </AnimatePresence>
+                </div>
 
-                {/* Usage stats */}
+                {/* Processing indicator */}
                 <AnimatePresence>
-                  {results && results.usage && (
+                  {processingStage && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      className="mt-6 p-4 rounded-xl bg-gradient-to-r from-success/10 to-primary/10 border border-success/20"
+                      className="glass-effect rounded-2xl p-6"
                     >
-                      <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-success" />
-                        Статистика обработки
-                      </h3>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Модель:</span>
-                          <span className="font-medium">{results.model || "mistral-ocr-latest"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Страниц обработано:</span>
-                          <span className="font-medium">{results.usage.pages_processed}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Размер документа:</span>
-                          <span className="font-medium">{formatBytes(results.usage.doc_size_bytes)}</span>
-                        </div>
-                      </div>
+                      <ProcessingIndicator stage={processingStage} />
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
 
-              {/* Processing indicator */}
-              <AnimatePresence>
-                {processingStage && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="glass-effect rounded-2xl p-6"
-                  >
-                    <ProcessingIndicator stage={processingStage} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Error display */}
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="glass-effect rounded-2xl p-6 border-error/20"
-                  >
-                    <ErrorDisplay message={error.message} details={error.details} onRetry={handleProcessFile} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.aside>
+                {/* Error display */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="glass-effect rounded-2xl p-6 border-error/20"
+                    >
+                      <ErrorDisplay message={error.message} details={error.details} onRetry={handleProcessFile} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.aside>
+            )}
 
             {/* Main content area */}
             <motion.section
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
-              className="lg:col-span-7 xl:col-span-8"
+              className={results ? "w-full" : "lg:col-span-7 xl:col-span-8"}
             >
-              <div className="glass-effect rounded-2xl p-6 min-h-[600px]">
+              <div className={`glass-effect rounded-2xl p-6 ${results ? 'min-h-[700px]' : 'min-h-[600px]'}`}>
                 <AnimatePresence mode="wait">
                   {results ? (
                     <motion.div
@@ -441,9 +431,65 @@ export default function Home() {
                 </AnimatePresence>
               </div>
             </motion.section>
+
+            {/* Статистика обработки - отдельная секция */}
+            <AnimatePresence>
+              {results && results.usage && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="glass-effect rounded-xl p-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-success/10 to-primary/10 border border-success/20">
+                      <div className="p-2 rounded-lg bg-success/20">
+                        <Sparkles className="h-4 w-4 text-success" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Модель</p>
+                        <p className="text-sm font-medium">{results.model || "mistral-ocr-latest"}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
+                      <div className="p-2 rounded-lg bg-primary/20">
+                        <FileText className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Страниц обработано</p>
+                        <p className="text-sm font-medium">{results.usage.pages_processed}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-accent/10 to-success/10 border border-accent/20">
+                      <div className="p-2 rounded-lg bg-accent/20">
+                        <Zap className="h-4 w-4 text-accent" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Размер документа</p>
+                        <p className="text-sm font-medium">{formatBytes(results.usage.doc_size_bytes)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </main>
+      
+      {/* Processing Modal */}
+      <ProcessingModal
+        isOpen={showProcessingModal}
+        stage={processingStage}
+        fileName={file?.name}
+        onClose={() => {
+          setShowProcessingModal(false)
+          setProcessingStage(null)
+        }}
+        onMinimize={() => setShowProcessingModal(false)}
+      />
       
       {/* Toast notifications */}
       <Toaster />
